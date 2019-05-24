@@ -1,0 +1,8 @@
+set SECRET_KEY=aldfjaldfj
+set GITHUB_CLIENT_ID=b8911f8dc433bc87e168
+set GITHUB_CLIENT_SECRET=8d2310a1f998cba9fa91d57f1a3d609cef312cc3
+
+set MONGO_USERNAME=angel
+set MONGO_PASSWORD=angel
+set MONGO_HOST=testbdd-vgeet.mongodb.net
+set MONGO_DBNAME=angel

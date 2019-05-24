@@ -1,17 +1,30 @@
 from flask import Flask, redirect, url_for, session, request, jsonify, Markup
 from flask_oauthlib.client import OAuth
 from flask import render_template
+from bson.objectid import ObjectId
 
-import pprint
+import pymongo
+import dns
 import os
-import json
+import sys
+import pprint
+
+ADMINS = ['AlexanderGHA', "angel9999"]
 
 app = Flask(__name__)
 
 app.debug = True #Change this to False for production
 
-myfile='posts.json'
-os.system("echo [] >"+ myfile)
+url = 'mongodb+srv://{}:{}@{}/{}'.format(
+    os.environ["MONGO_USERNAME"],
+    os.environ["MONGO_PASSWORD"],
+    os.environ["MONGO_HOST"],
+    os.environ["MONGO_DBNAME"]
+)
+
+client = pymongo.MongoClient(url)
+db = client[os.environ["MONGO_DBNAME"]]
+collection = db['angel']
 
 #remove vvv for production
 #os.environ['OAUTHLIB_INSECURE_TRANSPORT']='1'
@@ -29,12 +42,16 @@ github = oauth.remote_app(
         access_token_method='POST',
         access_token_url='https://github.com/login/oauth/access_token',  
         authorize_url='https://github.com/login/oauth/authorize' #URL for github's OAuth login
-        )
+)
 
 def posts_to_html(posts):
     messages = ""
     for i in posts:
-        messages += "<div class='posted'><p class='name'><b> %s </b>- <p class='message'> %s </p></div>" % (i['usr'], i['msg'])
+        if session['user_data']['login'] in ADMINS:
+            messages += ("<div class='posted'><p class='name'><b> %s </b>- <p class='message'> %s </p> <form action='/delete' method = 'post'><button type='submit' name='delete' value='%s'>Delete</button></form></div>")  % (i['usr'], i['msg'], str(i['_id']))
+        else:
+            messages += ("<div class='posted'><p class='name'><b> %s </b>- <p class='message'> %s </p> <form action='/delete' method = 'post'></form></div>") % (i['usr'], i['msg'])
+        
     return Markup(messages.replace('\r\n', '<br>'))
 
 @app.context_processor
@@ -43,8 +60,7 @@ def inject_logged_in():
 
 @app.route('/')
 def home():
-    with open(myfile, mode='r') as f:
-        data = json.load(f)
+    data = collection.find({})
     return render_template('home.html', past_posts=posts_to_html(data))
 
 @app.route('/posted', methods=['POST'])
@@ -53,18 +69,21 @@ def post():
     msg = request.form["message"]
     post={"usr": usr, "msg": msg}
     
-    with open(myfile, mode='r') as f:
-        data = json.load(f)
-        
-    data.append(post)
-    
-    with open(myfile, mode='w') as f:
-        json.dump(data, f)
-        
+    pprint.pprint(collection.insert_one(post))
+
     return redirect(url_for("home"))
     #This function should add the new post to the JSON file of posts and then render home.html and display the posts.  
     #Every post should include the username of the poster and text of the post. 
 #redirect to GitHub's OAuth page and confirm callback URL
+
+@app.route('/delete', methods=['POST'])
+def delete():
+    print(session['user_data']['login'])
+    if session['user_data']['login'] in ADMINS:
+        pprint.pprint(request.form['delete'])
+        Oid = request.form['delete']
+        collection.delete_one({'_id' : ObjectId(Oid)})
+    return redirect(url_for("home"))
 
 @app.route('/login')
 def login():   
